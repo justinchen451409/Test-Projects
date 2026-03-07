@@ -251,6 +251,48 @@
       color: #fff;
     }
 
+    /* ── Feedback banner ── */
+    .feedback-box {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border-left: 4px solid transparent;
+      font-size: 14px;
+    }
+
+    .feedback-box.correct {
+      background: #f0fdf4;
+      border-color: #22c55e;
+      color: #15803d;
+    }
+
+    .feedback-box.incorrect {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #b91c1c;
+    }
+
+    .feedback-result {
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    .feedback-correct-answer {
+      color: #374151;
+      font-size: 13px;
+    }
+
+    .feedback-correct-answer strong {
+      color: #16a34a;
+    }
+
+    .answer-input:read-only {
+      background: #f9fafb;
+      color: #6b7280;
+      cursor: default;
+    }
+
     /* ── Fade transition ── */
     .fade-in {
       animation: fadeIn 0.25s ease;
@@ -269,45 +311,59 @@
 <script>
   const QUESTIONS = [
     {
-      text: "What is the capital city of France?",
-      answer: "paris"
+      text: "What is J's favorite Fornite gun?",
+      answer: "Twin Hammer Shotgun"
     },
     {
-      text: "How many sides does a hexagon have?",
-      answer: "6"
+      text: "What is our favorite landing spot?",
+      answer: "Sandy Strip"
     },
     {
-      text: "What planet in our solar system is closest to the sun?",
-      answer: "mercury"
+      text: "What do we always say we need to do better when it comes to late game?",
+      answer: "Positioning"
     },
     {
-      text: "Who wrote the play \"Romeo and Juliet\"?",
-      answer: "shakespeare"
+      text: "What do we always buy from the vending machine?",
+      answer: "Self-revive"
     },
     {
-      text: "What is the chemical symbol for gold?",
-      answer: "au"
+      text: "Who always carries?",
+      answer: "Justin"
     }
   ];
 
   let currentIndex = 0;
   let userAnswers = new Array(QUESTIONS.length).fill("");
+  let feedbackMode = false;
 
   const app = document.getElementById("app");
 
+  // Strip punctuation, lowercase, collapse spaces
   function normalize(str) {
-    return str.trim().toLowerCase();
+    return str.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
   }
 
+  // Correct if: exact normalized match, OR correct answer contains what the user typed
   function isCorrect(userAnswer, correctAnswer) {
-    return normalize(userAnswer) === normalize(correctAnswer);
+    const u = normalize(userAnswer);
+    const c = normalize(correctAnswer);
+    if (!u) return false;
+    return u === c || c.includes(u);
   }
 
   function renderQuestion() {
     const q = QUESTIONS[currentIndex];
     const total = QUESTIONS.length;
-    const progressPct = ((currentIndex) / total) * 100;
+    const progressPct = (currentIndex / total) * 100;
     const isLast = currentIndex === total - 1;
+    const correct = feedbackMode && isCorrect(userAnswers[currentIndex], q.answer);
+
+    const feedbackHtml = feedbackMode ? `
+      <div class="feedback-box ${correct ? "correct" : "incorrect"}">
+        <div class="feedback-result">${correct ? "✓ Correct!" : "✗ Not quite."}</div>
+        ${!correct ? `<div class="feedback-correct-answer">Correct answer: <strong>${escapeHtml(q.answer)}</strong></div>` : ""}
+      </div>
+    ` : "";
 
     app.innerHTML = `
       <div class="fade-in">
@@ -330,45 +386,56 @@
           value="${escapeHtml(userAnswers[currentIndex])}"
           autocomplete="off"
           spellcheck="false"
+          ${feedbackMode ? "readonly" : ""}
         />
 
+        ${feedbackHtml}
+
         <div class="nav">
-          <button class="btn btn-ghost" id="btn-back" ${currentIndex === 0 ? "disabled" : ""}>
+          <button class="btn btn-ghost" id="btn-back" ${currentIndex === 0 || feedbackMode ? "disabled" : ""}>
             ← Back
           </button>
           <button class="btn btn-primary" id="btn-next">
-            ${isLast ? "Submit Quiz" : "Next →"}
+            ${feedbackMode
+              ? (isLast ? "See Results" : "Continue →")
+              : (isLast ? "Submit Quiz" : "Check Answer")}
           </button>
         </div>
       </div>
     `;
 
     const input = document.getElementById("answer-input");
-    input.focus();
+    if (!feedbackMode) input.focus();
 
-    // Persist typed answer on change
     input.addEventListener("input", () => {
       userAnswers[currentIndex] = input.value;
     });
 
-    // Allow Enter key to advance
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") document.getElementById("btn-next").click();
     });
 
     document.getElementById("btn-back").addEventListener("click", () => {
-      userAnswers[currentIndex] = input.value;
+      feedbackMode = false;
       currentIndex--;
       renderQuestion();
     });
 
     document.getElementById("btn-next").addEventListener("click", () => {
-      userAnswers[currentIndex] = input.value;
-      if (isLast) {
-        renderResults();
-      } else {
-        currentIndex++;
+      if (!feedbackMode) {
+        // First click: save answer and show feedback
+        userAnswers[currentIndex] = input.value;
+        feedbackMode = true;
         renderQuestion();
+      } else {
+        // Second click: advance
+        feedbackMode = false;
+        if (isLast) {
+          renderResults();
+        } else {
+          currentIndex++;
+          renderQuestion();
+        }
       }
     });
   }
