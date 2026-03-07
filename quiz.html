@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      width: 100%;
+      max-width: 600px;
+      padding: 40px;
+    }
+
+    /* ── Header ── */
+    .quiz-header {
+      margin-bottom: 32px;
+    }
+
+    .quiz-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar-track {
+      background: #e5e7eb;
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: #4f46e5;
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-label {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 8px;
+      text-align: right;
+    }
+
+    /* ── Question ── */
+    .question-number {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #4f46e5;
+      margin-bottom: 12px;
+    }
+
+    .question-text {
+      font-size: 22px;
+      font-weight: 600;
+      color: #111827;
+      line-height: 1.4;
+      margin-bottom: 28px;
+    }
+
+    .answer-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+      color: #111827;
+    }
+
+    .answer-input:focus {
+      border-color: #4f46e5;
+    }
+
+    /* ── Navigation ── */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 32px;
+    }
+
+    .btn {
+      padding: 12px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary {
+      background: #4f46e5;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: #6b7280;
+      padding-left: 0;
+    }
+
+    .btn-ghost:hover {
+      color: #111827;
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    /* ── Results ── */
+    .results-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .score-circle {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: #eef2ff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+
+    .score-number {
+      font-size: 36px;
+      font-weight: 800;
+      color: #4f46e5;
+      line-height: 1;
+    }
+
+    .score-denom {
+      font-size: 14px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .results-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .results-subtitle {
+      font-size: 14px;
+      color: #6b7280;
+      margin-top: 6px;
+    }
+
+    /* ── Review list ── */
+    .review-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .review-item {
+      border-radius: 8px;
+      padding: 16px 18px;
+      border-left: 4px solid transparent;
+    }
+
+    .review-item.correct {
+      background: #f0fdf4;
+      border-color: #22c55e;
+    }
+
+    .review-item.incorrect {
+      background: #fef2f2;
+      border-color: #ef4444;
+    }
+
+    .review-q {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .review-row {
+      font-size: 13px;
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .review-label {
+      font-weight: 600;
+      min-width: 90px;
+      color: #6b7280;
+    }
+
+    .review-value {
+      color: #111827;
+    }
+
+    .review-value.right {
+      color: #16a34a;
+      font-weight: 600;
+    }
+
+    .review-value.wrong {
+      color: #dc2626;
+      text-decoration: line-through;
+    }
+
+    .btn-retake {
+      display: block;
+      margin: 28px auto 0;
+      background: #4f46e5;
+      color: #fff;
+    }
+
+    /* ── Fade transition ── */
+    .fade-in {
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="card" id="app"></div>
+
+<script>
+  const QUESTIONS = [
+    {
+      text: "What is the capital city of France?",
+      answer: "paris"
+    },
+    {
+      text: "How many sides does a hexagon have?",
+      answer: "6"
+    },
+    {
+      text: "What planet in our solar system is closest to the sun?",
+      answer: "mercury"
+    },
+    {
+      text: "Who wrote the play \"Romeo and Juliet\"?",
+      answer: "shakespeare"
+    },
+    {
+      text: "What is the chemical symbol for gold?",
+      answer: "au"
+    }
+  ];
+
+  let currentIndex = 0;
+  let userAnswers = new Array(QUESTIONS.length).fill("");
+
+  const app = document.getElementById("app");
+
+  function normalize(str) {
+    return str.trim().toLowerCase();
+  }
+
+  function isCorrect(userAnswer, correctAnswer) {
+    return normalize(userAnswer) === normalize(correctAnswer);
+  }
+
+  function renderQuestion() {
+    const q = QUESTIONS[currentIndex];
+    const total = QUESTIONS.length;
+    const progressPct = ((currentIndex) / total) * 100;
+    const isLast = currentIndex === total - 1;
+
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="quiz-header">
+          <div class="quiz-title">General Knowledge Quiz</div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width: ${progressPct}%"></div>
+          </div>
+          <div class="progress-label">Question ${currentIndex + 1} of ${total}</div>
+        </div>
+
+        <div class="question-number">Question ${currentIndex + 1}</div>
+        <div class="question-text">${q.text}</div>
+
+        <input
+          class="answer-input"
+          id="answer-input"
+          type="text"
+          placeholder="Type your answer here…"
+          value="${escapeHtml(userAnswers[currentIndex])}"
+          autocomplete="off"
+          spellcheck="false"
+        />
+
+        <div class="nav">
+          <button class="btn btn-ghost" id="btn-back" ${currentIndex === 0 ? "disabled" : ""}>
+            ← Back
+          </button>
+          <button class="btn btn-primary" id="btn-next">
+            ${isLast ? "Submit Quiz" : "Next →"}
+          </button>
+        </div>
+      </div>
+    `;
+
+    const input = document.getElementById("answer-input");
+    input.focus();
+
+    // Persist typed answer on change
+    input.addEventListener("input", () => {
+      userAnswers[currentIndex] = input.value;
+    });
+
+    // Allow Enter key to advance
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("btn-next").click();
+    });
+
+    document.getElementById("btn-back").addEventListener("click", () => {
+      userAnswers[currentIndex] = input.value;
+      currentIndex--;
+      renderQuestion();
+    });
+
+    document.getElementById("btn-next").addEventListener("click", () => {
+      userAnswers[currentIndex] = input.value;
+      if (isLast) {
+        renderResults();
+      } else {
+        currentIndex++;
+        renderQuestion();
+      }
+    });
+  }
+
+  function renderResults() {
+    const total = QUESTIONS.length;
+    const score = QUESTIONS.reduce((acc, q, i) => {
+      return acc + (isCorrect(userAnswers[i], q.answer) ? 1 : 0);
+    }, 0);
+
+    const grade = score === total
+      ? "Perfect score! 🎉"
+      : score >= total * 0.8
+      ? "Great job!"
+      : score >= total * 0.6
+      ? "Not bad!"
+      : score >= total * 0.4
+      ? "Keep practicing!"
+      : "Better luck next time!";
+
+    const reviewItems = QUESTIONS.map((q, i) => {
+      const correct = isCorrect(userAnswers[i], q.answer);
+      const userVal = userAnswers[i].trim() || "(no answer)";
+      return `
+        <div class="review-item ${correct ? "correct" : "incorrect"}">
+          <div class="review-q">Q${i + 1}: ${q.text}</div>
+          <div class="review-row">
+            <span class="review-label">Your answer:</span>
+            <span class="review-value ${correct ? "right" : "wrong"}">${escapeHtml(userVal)}</span>
+          </div>
+          ${!correct ? `
+          <div class="review-row">
+            <span class="review-label">Correct answer:</span>
+            <span class="review-value right">${capitalizeFirst(q.answer)}</span>
+          </div>` : ""}
+        </div>
+      `;
+    }).join("");
+
+    app.innerHTML = `
+      <div class="fade-in">
+        <div class="results-header">
+          <div class="score-circle">
+            <span class="score-number">${score}</span>
+            <span class="score-denom">out of ${total}</span>
+          </div>
+          <div class="results-title">${grade}</div>
+          <div class="results-subtitle">Here's how you did on each question.</div>
+        </div>
+
+        <div class="review-list">${reviewItems}</div>
+
+        <button class="btn btn-retake" id="btn-retake">Retake Quiz</button>
+      </div>
+    `;
+
+    document.getElementById("btn-retake").addEventListener("click", () => {
+      currentIndex = 0;
+      userAnswers = new Array(QUESTIONS.length).fill("");
+      renderQuestion();
+    });
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // Boot
+  renderQuestion();
+</script>
+</body>
+</html>
