@@ -131,6 +131,18 @@ const last7   = () => Array.from({ length: 7 }, (_, i) => {
   d.setDate(d.getDate() - (6 - i));
   return d.toISOString().split('T')[0];
 });
+// Returns the Mon–Sun of the current calendar week
+const currentWeek = () => {
+  const d   = new Date();
+  const day = d.getDay(); // 0=Sun … 6=Sat
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const nd = new Date(mon);
+    nd.setDate(mon.getDate() + i);
+    return nd.toISOString().split('T')[0];
+  });
+};
 const uid     = () => Math.random().toString(36).slice(2, 10);
 
 function useStorage(key, init) {
@@ -282,19 +294,24 @@ function SuggestedHabits({ habits, onAdd, dark }) {
   const toggleCat = (cat) => setOpenCats(prev => ({ ...prev, [cat]: !prev[cat] }));
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 12, marginBottom: 16 }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          width: '100%', background: 'none',
-          border: `1.5px dashed ${t.border}`,
-          borderRadius: 9, padding: '10px 16px',
-          color: t.textSub, fontSize: 11, fontWeight: 700,
+          width: '100%',
+          background: open ? 'none' : (dark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.07)'),
+          border: `1.5px solid ${open ? t.border : '#6366f1'}`,
+          borderRadius: 10, padding: '11px 18px',
+          color: open ? t.textSub : '#6366f1', fontSize: 12, fontWeight: 700,
           letterSpacing: '0.07em', cursor: 'pointer', fontFamily: 'inherit',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          boxShadow: open ? 'none' : '0 0 0 3px rgba(99,102,241,0.15)',
+          transition: 'all 0.2s',
         }}
       >
+        <span style={{ fontSize: 14 }}>✦</span>
         {open ? '▲' : '▼'} SUGGESTED HABITS
+        {!open && <span style={{ background: '#6366f1', color: '#fff', borderRadius: 99, padding: '1px 8px', fontSize: 10, fontWeight: 800, marginLeft: 4 }}>EXPLORE</span>}
       </button>
 
       {open && (
@@ -373,7 +390,7 @@ export default function App() {
   const [habits,      setHabits]      = useStorage('ht_h4', []);
   const [logs,        setLogs]        = useStorage('ht_l4', {});
   const [tutorialDone,setTutorialDone]= useStorage('ht_t4', false);
-  const [dark,        setDark]        = useStorage('ht_d4', false);
+  const [dark,        setDark]        = useStorage('ht_d4', true);
 
   const [view,        setView]        = useState('today');
   const [showAdd,     setShowAdd]     = useState(false);
@@ -384,10 +401,11 @@ export default function App() {
   const [filterCat,   setFilterCat]   = useState('All');
   const [showDevMenu, setShowDevMenu] = useState(false);
 
-  const t        = T(dark);
-  const todayStr = today();
-  const quote    = QUOTES[new Date().getDay() % QUOTES.length];
-  const days     = last7();
+  const t            = T(dark);
+  const todayStr     = today();
+  const quote        = QUOTES[new Date().getDay() % QUOTES.length];
+  const days         = last7();       // last 7 days — used for rate() and Progress view
+  const weekViewDays = currentWeek(); // Mon–Sun of this week — used for the bar chart
 
   // ── Computed ─────────────────────────────────────────────────────────────
   const streak = (hid) => {
@@ -419,6 +437,12 @@ export default function App() {
   const weeklyCount = habits.filter(h => h.freq === 'weekly').length;
 
   const weekData = days.map(d => {
+    if (habits.length === 0) return 0;
+    const done = habits.filter(h => logs[`${h.id}_${d}`]).length;
+    return Math.round((done / habits.length) * 100);
+  });
+
+  const weekBarData = weekViewDays.map(d => {
     if (habits.length === 0) return 0;
     const done = habits.filter(h => logs[`${h.id}_${d}`]).length;
     return Math.round((done / habits.length) * 100);
@@ -603,25 +627,28 @@ export default function App() {
             </div>
           </div>
 
-          {/* Weekly bar chart */}
+          {/* Weekly bar chart — Mon to Sun of current week */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 8 }}>THIS WEEK AT A GLANCE</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-              {days.map((d, i) => {
-                const pct = weekData[i];
-                const isToday = d === todayStr;
+              {weekViewDays.map((d, i) => {
+                const pct      = weekBarData[i];
+                const isToday  = d === todayStr;
+                const isFuture = d > todayStr;
                 const barColor = pct === 100 ? '#10b981' : '#6366f1';
                 return (
-                  <div key={d} style={{ textAlign: 'center' }}>
+                  <div key={d} style={{ textAlign: 'center', opacity: isFuture ? 0.35 : 1, transition: 'opacity 0.2s' }}>
                     <div style={{
                       height: 52, background: t.progressBg, borderRadius: 6,
                       border: isToday ? `2px solid #6366f1` : `1px solid ${t.border}`,
                       position: 'relative', overflow: 'hidden',
                     }}>
-                      <div style={{
-                        position: 'absolute', bottom: 0, left: 0, right: 0,
-                        height: `${pct}%`, background: barColor, transition: 'height 0.3s',
-                      }} />
+                      {!isFuture && (
+                        <div style={{
+                          position: 'absolute', bottom: 0, left: 0, right: 0,
+                          height: `${pct}%`, background: barColor, transition: 'height 0.3s',
+                        }} />
+                      )}
                     </div>
                     <div style={{
                       fontSize: 10, marginTop: 4, fontWeight: isToday ? 700 : 500,
@@ -678,6 +705,9 @@ export default function App() {
             }}
           >+ Add Habit</button>
         </div>
+
+        {/* Suggested habits — shown right below the header so users see it immediately */}
+        <SuggestedHabits habits={habits} onAdd={addSuggested} dark={dark} />
 
         {/* ── Today view ── */}
         {view === 'today' && (
@@ -768,7 +798,6 @@ export default function App() {
                 })}
               </div>
             )}
-            <SuggestedHabits habits={habits} onAdd={addSuggested} dark={dark} />
           </>
         )}
 
