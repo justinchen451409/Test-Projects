@@ -642,7 +642,7 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
 }
 
 // ── Auth Screen ───────────────────────────────────────────────────────────────
-function AuthScreen() {
+function AuthScreen({ onGuest }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -728,6 +728,15 @@ function AuthScreen() {
             {isSignUp ? 'Sign in' : 'Sign up'}
           </button>
         </p>
+
+        <div style={{ marginTop: 16, borderTop: '1px solid #2a2d3e', paddingTop: 16, textAlign: 'center' }}>
+          <button onClick={onGuest} style={{
+            background: 'none', border: 'none', color: '#64748b',
+            cursor: 'pointer', fontFamily: font, fontSize: 13, padding: 0,
+          }}>
+            Continue as guest
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -735,9 +744,10 @@ function AuthScreen() {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [session, setSession] = useState(undefined); // undefined = loading, null = logged out
-  const [habits,      setHabits]      = useState([]);
-  const [logs,        setLogs]        = useState({});
+  const [session,   setSession]   = useState(undefined); // undefined = loading, null = logged out
+  const [guestMode, setGuestMode] = useState(() => sessionStorage.getItem('ht_guest') === '1');
+  const [habits,    setHabits]    = useState([]);
+  const [logs,      setLogs]      = useState({});
   const [tutorialDone,setTutorialDone]= useStorage('ht_t4', false);
   const [dark,        setDark]        = useStorage('ht_d4', true);
 
@@ -759,8 +769,13 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Load from Supabase when session is ready ──────────────────────────────
+  // ── Load data on mount ────────────────────────────────────────────────────
   useEffect(() => {
+    if (guestMode) {
+      try { const d = localStorage.getItem('ht_h4'); if (d) setHabits(JSON.parse(d)); } catch {}
+      try { const d = localStorage.getItem('ht_l4'); if (d) setLogs(JSON.parse(d)); } catch {}
+      return;
+    }
     if (!session) return;
     supabase.from('habits').select('*').then(({ data }) => {
       if (data) setHabits(data);
@@ -772,7 +787,15 @@ export default function App() {
         setLogs(obj);
       }
     });
-  }, [session]);
+  }, [session, guestMode]);
+
+  // ── Sync to localStorage in guest mode ───────────────────────────────────
+  useEffect(() => {
+    if (guestMode) localStorage.setItem('ht_h4', JSON.stringify(habits));
+  }, [habits, guestMode]);
+  useEffect(() => {
+    if (guestMode) localStorage.setItem('ht_l4', JSON.stringify(logs));
+  }, [logs, guestMode]);
 
   const t            = T(dark);
   const todayStr     = today();
@@ -844,10 +867,9 @@ export default function App() {
       if (wasDone) delete next[key]; else next[key] = true;
       return next;
     });
-    if (wasDone) {
-      supabase.from('logs').delete().eq('habit_id', hid).eq('date', todayStr);
-    } else {
-      supabase.from('logs').insert({ habit_id: hid, date: todayStr });
+    if (!guestMode) {
+      if (wasDone) supabase.from('logs').delete().eq('habit_id', hid).eq('date', todayStr);
+      else         supabase.from('logs').insert({ habit_id: hid, date: todayStr });
     }
   };
 
@@ -871,12 +893,12 @@ export default function App() {
     if (editId) {
       const updates = { name, freq: newHabit.freq, color: newHabit.color, category: newHabit.category };
       setHabits(prev => prev.map(h => h.id === editId ? { ...h, ...updates } : h));
-      supabase.from('habits').update(updates).eq('id', editId);
+      if (!guestMode) supabase.from('habits').update(updates).eq('id', editId);
     } else {
       const id = uid();
-      const habit = { ...newHabit, id, name, created_at: new Date().toISOString(), user_id: session.user.id };
+      const habit = { ...newHabit, id, name, created_at: new Date().toISOString(), ...(!guestMode && { user_id: session.user.id }) };
       setHabits(prev => [...prev, habit]);
-      supabase.from('habits').insert(habit);
+      if (!guestMode) supabase.from('habits').insert(habit);
     }
     closeModal();
   };
@@ -888,27 +910,30 @@ export default function App() {
       Object.keys(next).filter(k => k.startsWith(hid + '_')).forEach(k => delete next[k]);
       return next;
     });
-    supabase.from('habits').delete().eq('id', hid);
+    if (!guestMode) supabase.from('habits').delete().eq('id', hid);
   };
 
   const addSuggested = (s) => {
     if (habits.some(h => h.name === s.name)) return;
     const id = uid();
-    const habit = { ...s, id, created_at: new Date().toISOString(), user_id: session.user.id };
+    const habit = { ...s, id, created_at: new Date().toISOString(), ...(!guestMode && { user_id: session.user.id }) };
     setHabits(prev => [...prev, habit]);
-    supabase.from('habits').insert(habit);
+    if (!guestMode) supabase.from('habits').insert(habit);
   };
 
   const resetAll = () => {
-    ['ht_t4','ht_d4','ht_name4','ht_friends4'].forEach(k => localStorage.removeItem(k));
-    supabase.from('habits').delete().neq('id', '');
+    ['ht_t4','ht_d4','ht_name4','ht_friends4','ht_h4','ht_l4'].forEach(k => localStorage.removeItem(k));
+    if (!guestMode) supabase.from('habits').delete().neq('id', '');
     setHabits([]); setLogs({}); setTutorialDone(false); setDark(false); setUserName(''); setFriends([]); setShowDevMenu(false);
   };
 
   const font = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
 
-  if (session === undefined) return null; // still loading
-  if (!session) return <AuthScreen />;
+  const enterGuest = () => { sessionStorage.setItem('ht_guest', '1'); setGuestMode(true); };
+  const exitGuest  = () => { sessionStorage.removeItem('ht_guest'); setGuestMode(false); setHabits([]); setLogs({}); };
+
+  if (session === undefined && !guestMode) return null; // still loading
+  if (!session && !guestMode) return <AuthScreen onGuest={enterGuest} />;
 
   return (
     <div style={{ minHeight: '100vh', background: t.bg, fontFamily: font, color: t.text, transition: 'background 0.2s' }}>
@@ -969,13 +994,13 @@ export default function App() {
             {dark ? '☀️ Light' : '🌙 Dark'}
           </button>
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => guestMode ? exitGuest() : supabase.auth.signOut()}
             style={{
               background: 'none', border: `1px solid ${t.border}`, borderRadius: 99,
               padding: '5px 12px', fontSize: 12, fontWeight: 600, color: t.textSub,
               cursor: 'pointer', fontFamily: font,
             }}
-          >Sign out</button>
+          >{guestMode ? 'Exit guest' : 'Sign out'}</button>
         </div>
       </div>
 
