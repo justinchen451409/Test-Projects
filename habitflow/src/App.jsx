@@ -385,6 +385,192 @@ function SuggestedHabits({ habits, onAdd, dark }) {
   );
 }
 
+// ── FriendsView ───────────────────────────────────────────────────────────────
+function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onRemoveFriend, dark }) {
+  const [code, setCode]         = useState('');
+  const [error, setError]       = useState('');
+  const [copied, setCopied]     = useState(false);
+  const [editName, setEditName] = useState(false);
+  const [nameInput, setNameInput] = useState(userName);
+  const t    = T(dark);
+  const font = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
+
+  const allEntries = [{ ...myStats, isMe: true }, ...friends]
+    .sort((a, b) => b.score - a.score);
+
+  const handleAdd = () => {
+    try {
+      const parsed = JSON.parse(atob(code.trim()));
+      if (!parsed.n || parsed.wa === undefined || parsed.bs === undefined) throw new Error();
+      onAddFriend({
+        id: uid(),
+        name: parsed.n,
+        weeklyAvg: parsed.wa,
+        bestStreak: parsed.bs,
+        totalHabits: parsed.th,
+        score: parsed.sc,
+        addedAt: new Date().toISOString(),
+      });
+      setCode(''); setError('');
+    } catch { setError('Invalid code — ask your friend to copy it again.'); }
+  };
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(myStats.shareCode).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const saveName = () => {
+    setUserName(nameInput.trim() || 'Anonymous');
+    setEditName(false);
+  };
+
+  const MEDAL = ['🥇', '🥈', '🥉'];
+
+  return (
+    <div style={{ animation: 'fade-in 0.3s ease' }}>
+
+      {/* Your name */}
+      <div style={{
+        background: t.surface, borderRadius: 14, padding: '16px 18px',
+        border: `1px solid ${t.border}`, boxShadow: t.shadow, marginBottom: 14,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 8 }}>YOUR DISPLAY NAME</div>
+        {editName ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              autoFocus value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveName()}
+              placeholder="Enter your name..."
+              style={{
+                flex: 1, background: t.inputBg, border: `1px solid ${t.border}`,
+                borderRadius: 9, padding: '9px 12px', fontSize: 13,
+                color: t.text, fontFamily: font, outline: 'none',
+              }}
+            />
+            <button onClick={saveName} style={{
+              background: '#6366f1', color: '#fff', border: 'none',
+              borderRadius: 9, padding: '9px 16px', fontSize: 13,
+              fontWeight: 600, cursor: 'pointer', fontFamily: font,
+            }}>Save</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: t.text }}>{userName || 'Anonymous'}</span>
+            <button onClick={() => { setNameInput(userName); setEditName(true); }} style={{
+              background: 'none', border: `1px solid ${t.border}`, borderRadius: 7,
+              padding: '4px 10px', fontSize: 12, color: t.textSub, cursor: 'pointer', fontFamily: font,
+            }}>Edit</button>
+          </div>
+        )}
+      </div>
+
+      {/* Share code */}
+      <div style={{
+        background: t.surface, borderRadius: 14, padding: '16px 18px',
+        border: `1px solid ${t.border}`, boxShadow: t.shadow, marginBottom: 14,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 6 }}>YOUR SHARE CODE</div>
+        <div style={{ fontSize: 13, color: t.textSub, marginBottom: 10 }}>Send this to friends so they can add you to their leaderboard.</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{
+            flex: 1, background: t.inputBg, border: `1px solid ${t.border}`,
+            borderRadius: 9, padding: '9px 12px', fontSize: 11,
+            color: t.textMuted, fontFamily: 'monospace',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{myStats.shareCode}</div>
+          <button onClick={copyCode} style={{
+            background: copied ? '#10b981' : '#6366f1', color: '#fff',
+            border: 'none', borderRadius: 9, padding: '9px 16px',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: font,
+            flexShrink: 0, transition: 'background 0.2s',
+          }}>{copied ? '✓ Copied!' : 'Copy'}</button>
+        </div>
+      </div>
+
+      {/* Add friend */}
+      <div style={{
+        background: t.surface, borderRadius: 14, padding: '16px 18px',
+        border: `1px solid ${t.border}`, boxShadow: t.shadow, marginBottom: 20,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 8 }}>ADD A FRIEND</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={code}
+            onChange={e => { setCode(e.target.value); setError(''); }}
+            placeholder="Paste friend's share code..."
+            style={{
+              flex: 1, background: t.inputBg,
+              border: `1px solid ${error ? '#ef4444' : t.border}`,
+              borderRadius: 9, padding: '9px 12px', fontSize: 13,
+              color: t.text, fontFamily: font, outline: 'none',
+            }}
+          />
+          <button onClick={handleAdd} disabled={!code.trim()} style={{
+            background: code.trim() ? '#6366f1' : t.pill,
+            color: code.trim() ? '#fff' : t.textMuted,
+            border: 'none', borderRadius: 9, padding: '9px 16px',
+            fontSize: 13, fontWeight: 600,
+            cursor: code.trim() ? 'pointer' : 'default',
+            fontFamily: font, flexShrink: 0, transition: 'all 0.2s',
+          }}>Add</button>
+        </div>
+        {error && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>{error}</div>}
+      </div>
+
+      {/* Leaderboard */}
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 10 }}>
+        LEADERBOARD · {allEntries.length} {allEntries.length === 1 ? 'PERSON' : 'PEOPLE'}
+      </div>
+
+      {allEntries.map((entry, i) => (
+        <div key={entry.isMe ? 'me' : entry.id} style={{
+          background: entry.isMe ? (dark ? '#1e2235' : '#eef2ff') : t.surface,
+          border: `1px solid ${entry.isMe ? '#6366f1' : t.border}`,
+          borderRadius: 14, padding: '14px 16px', marginBottom: 10,
+          boxShadow: t.shadow, display: 'flex', alignItems: 'center', gap: 14,
+          animation: 'fade-in 0.3s ease',
+        }}>
+          <div style={{ fontSize: 22, width: 32, textAlign: 'center', flexShrink: 0, fontWeight: 700, color: t.textSub }}>
+            {i < 3 ? MEDAL[i] : `#${i + 1}`}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: t.text }}>{entry.name}</span>
+              {entry.isMe && (
+                <span style={{ fontSize: 10, fontWeight: 700, background: '#6366f1', color: '#fff', borderRadius: 99, padding: '1px 7px' }}>YOU</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#f97316', fontWeight: 600 }}>🔥 {entry.bestStreak}d streak</span>
+              <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>📊 {entry.weeklyAvg}% weekly</span>
+              <span style={{ fontSize: 12, color: t.textMuted }}>✦ {entry.totalHabits} habits</span>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#6366f1', letterSpacing: '-0.03em', lineHeight: 1 }}>{entry.score}</div>
+            <div style={{ fontSize: 10, color: t.textMuted, fontWeight: 600, marginTop: 2 }}>SCORE</div>
+          </div>
+          {!entry.isMe && (
+            <button
+              onClick={() => onRemoveFriend(entry.id)}
+              style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 13, padding: '0 3px', fontFamily: font }}
+            >✕</button>
+          )}
+        </div>
+      ))}
+
+      {allEntries.length === 1 && (
+        <div style={{ textAlign: 'center', padding: '24px 0', color: t.textSub, fontSize: 13 }}>
+          No friends added yet. Share your code and paste theirs to compete!
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [habits,      setHabits]      = useStorage('ht_h4', []);
@@ -400,6 +586,8 @@ export default function App() {
   const [completing,  setCompleting]  = useState({});
   const [filterCat,   setFilterCat]   = useState('All');
   const [showDevMenu, setShowDevMenu] = useState(false);
+  const [userName,    setUserName]    = useStorage('ht_name4', '');
+  const [friends,     setFriends]     = useStorage('ht_friends4', []);
 
   const t            = T(dark);
   const todayStr     = today();
@@ -447,6 +635,14 @@ export default function App() {
     const done = habits.filter(h => logs[`${h.id}_${d}`]).length;
     return Math.round((done / habits.length) * 100);
   });
+
+  // ── Friends / Leaderboard ─────────────────────────────────────────────────
+  const myScore   = weeklyAvg + bestStreak * 2;
+  const shareCode = btoa(JSON.stringify({ n: userName || 'Anonymous', wa: weeklyAvg, bs: bestStreak, th: habits.length, sc: myScore }));
+  const myStats   = { name: userName || 'Anonymous', weeklyAvg, bestStreak, totalHabits: habits.length, score: myScore, shareCode };
+
+  const addFriend    = (f) => setFriends(prev => [...prev, f]);
+  const removeFriend = (id) => setFriends(prev => prev.filter(f => f.id !== id));
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const toggleLog = (hid, e) => {
@@ -504,8 +700,8 @@ export default function App() {
   };
 
   const resetAll = () => {
-    ['ht_h4','ht_l4','ht_t4','ht_d4'].forEach(k => localStorage.removeItem(k));
-    setHabits([]); setLogs({}); setTutorialDone(false); setDark(false); setShowDevMenu(false);
+    ['ht_h4','ht_l4','ht_t4','ht_d4','ht_name4','ht_friends4'].forEach(k => localStorage.removeItem(k));
+    setHabits([]); setLogs({}); setTutorialDone(false); setDark(false); setUserName(''); setFriends([]); setShowDevMenu(false);
   };
 
   const font = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
@@ -542,7 +738,7 @@ export default function App() {
 
         {/* Segmented tabs */}
         <div style={{ display: 'flex', background: t.pill, borderRadius: 9, padding: 3, gap: 2 }}>
-          {[['today','Today'], ['progress','Progress']].map(([v, label]) => (
+          {[['today','Today'], ['progress','Progress'], ['friends','Friends']].map(([v, label]) => (
             <button key={v} onClick={() => setView(v)} style={{
               background: view === v ? t.surface : 'none',
               border: 'none', borderRadius: 7, padding: '6px 18px',
@@ -855,6 +1051,19 @@ export default function App() {
               })}
             </div>
           )
+        )}
+
+        {/* ── Friends / Leaderboard view ── */}
+        {view === 'friends' && (
+          <FriendsView
+            myStats={myStats}
+            userName={userName}
+            setUserName={setUserName}
+            friends={friends}
+            onAddFriend={addFriend}
+            onRemoveFriend={removeFriend}
+            dark={dark}
+          />
         )}
       </div>
 
