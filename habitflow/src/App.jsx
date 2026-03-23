@@ -387,10 +387,12 @@ function SuggestedHabits({ habits, onAdd, dark }) {
 
 // ── FriendsView ───────────────────────────────────────────────────────────────
 function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onRemoveFriend, dark }) {
-  const [code, setCode]         = useState('');
-  const [error, setError]       = useState('');
-  const [copied, setCopied]     = useState(false);
-  const [editName, setEditName] = useState(false);
+  const [code, setCode]           = useState('');
+  const [error, setError]         = useState('');
+  const [copied, setCopied]       = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showAdd, setShowAdd]     = useState(false);
+  const [editName, setEditName]   = useState(false);
   const [nameInput, setNameInput] = useState(userName);
   const t    = T(dark);
   const font = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
@@ -411,7 +413,7 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
         score: parsed.sc,
         addedAt: new Date().toISOString(),
       });
-      setCode(''); setError('');
+      setCode(''); setError(''); setShowAdd(false);
     } catch { setError('Invalid code — ask your friend to copy it again.'); }
   };
 
@@ -431,94 +433,129 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
   return (
     <div style={{ animation: 'fade-in 0.3s ease' }}>
 
-      {/* Your name */}
-      <div style={{
-        background: t.surface, borderRadius: 14, padding: '16px 18px',
-        border: `1px solid ${t.border}`, boxShadow: t.shadow, marginBottom: 14,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 8 }}>YOUR DISPLAY NAME</div>
+      {/* Top bar: name + action buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {/* Name display / edit */}
         {editName ? (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6, flex: 1, minWidth: 200 }}>
             <input
               autoFocus value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && saveName()}
-              placeholder="Enter your name..."
+              placeholder="Your display name..."
               style={{
                 flex: 1, background: t.inputBg, border: `1px solid ${t.border}`,
-                borderRadius: 9, padding: '9px 12px', fontSize: 13,
+                borderRadius: 9, padding: '7px 11px', fontSize: 13,
                 color: t.text, fontFamily: font, outline: 'none',
               }}
             />
             <button onClick={saveName} style={{
               background: '#6366f1', color: '#fff', border: 'none',
-              borderRadius: 9, padding: '9px 16px', fontSize: 13,
+              borderRadius: 9, padding: '7px 14px', fontSize: 13,
               fontWeight: 600, cursor: 'pointer', fontFamily: font,
             }}>Save</button>
+            <button onClick={() => setEditName(false)} style={{
+              background: 'none', border: `1px solid ${t.border}`, borderRadius: 9,
+              padding: '7px 10px', fontSize: 13, color: t.textSub, cursor: 'pointer', fontFamily: font,
+            }}>✕</button>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: t.text }}>{userName || 'Anonymous'}</span>
-            <button onClick={() => { setNameInput(userName); setEditName(true); }} style={{
-              background: 'none', border: `1px solid ${t.border}`, borderRadius: 7,
-              padding: '4px 10px', fontSize: 12, color: t.textSub, cursor: 'pointer', fontFamily: font,
-            }}>Edit</button>
-          </div>
+          <button onClick={() => { setNameInput(userName); setEditName(true); }} style={{
+            background: 'none', border: `1px solid ${t.border}`, borderRadius: 9,
+            padding: '7px 12px', fontSize: 13, color: t.textSub, cursor: 'pointer',
+            fontFamily: font, display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span style={{ fontWeight: 700, color: t.text }}>{userName || 'Set your name'}</span>
+            <span style={{ fontSize: 11 }}>✎</span>
+          </button>
         )}
-      </div>
 
-      {/* Share code */}
-      <div style={{
-        background: t.surface, borderRadius: 14, padding: '16px 18px',
-        border: `1px solid ${t.border}`, boxShadow: t.shadow, marginBottom: 14,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 6 }}>YOUR SHARE CODE</div>
-        <div style={{ fontSize: 13, color: t.textSub, marginBottom: 10 }}>Send this to friends so they can add you to their leaderboard.</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{
-            flex: 1, background: t.inputBg, border: `1px solid ${t.border}`,
-            borderRadius: 9, padding: '9px 12px', fontSize: 11,
-            color: t.textMuted, fontFamily: 'monospace',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{myStats.shareCode}</div>
-          <button onClick={copyCode} style={{
-            background: copied ? '#10b981' : '#6366f1', color: '#fff',
-            border: 'none', borderRadius: 9, padding: '9px 16px',
+        <div style={{ flex: 1 }} />
+
+        {/* Share code button */}
+        <button
+          onClick={() => { setShowShare(s => !s); setShowAdd(false); }}
+          style={{
+            background: showShare ? t.surface : 'rgba(99,102,241,0.1)',
+            border: `1px solid ${showShare ? t.border : '#6366f1'}`,
+            color: showShare ? t.textSub : '#6366f1',
+            borderRadius: 9, padding: '7px 14px', fontSize: 13,
+            fontWeight: 600, cursor: 'pointer', fontFamily: font,
+            display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s',
+          }}
+        >{showShare ? '✕ Close' : '+ Share My Code'}</button>
+
+        {/* Add friend button */}
+        <button
+          onClick={() => { setShowAdd(s => !s); setShowShare(false); setError(''); }}
+          style={{
+            background: '#6366f1', color: '#fff',
+            border: 'none', borderRadius: 9, padding: '7px 14px',
             fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: font,
-            flexShrink: 0, transition: 'background 0.2s',
-          }}>{copied ? '✓ Copied!' : 'Copy'}</button>
-        </div>
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}
+        >{showAdd ? '✕ Cancel' : '+ Add Friend'}</button>
       </div>
 
-      {/* Add friend */}
-      <div style={{
-        background: t.surface, borderRadius: 14, padding: '16px 18px',
-        border: `1px solid ${t.border}`, boxShadow: t.shadow, marginBottom: 20,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 8 }}>ADD A FRIEND</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={code}
-            onChange={e => { setCode(e.target.value); setError(''); }}
-            placeholder="Paste friend's share code..."
-            style={{
-              flex: 1, background: t.inputBg,
-              border: `1px solid ${error ? '#ef4444' : t.border}`,
-              borderRadius: 9, padding: '9px 12px', fontSize: 13,
-              color: t.text, fontFamily: font, outline: 'none',
-            }}
-          />
-          <button onClick={handleAdd} disabled={!code.trim()} style={{
-            background: code.trim() ? '#6366f1' : t.pill,
-            color: code.trim() ? '#fff' : t.textMuted,
-            border: 'none', borderRadius: 9, padding: '9px 16px',
-            fontSize: 13, fontWeight: 600,
-            cursor: code.trim() ? 'pointer' : 'default',
-            fontFamily: font, flexShrink: 0, transition: 'all 0.2s',
-          }}>Add</button>
+      {/* Share code panel */}
+      {showShare && (
+        <div style={{
+          background: t.surface, borderRadius: 12, padding: '14px 16px',
+          border: `1px solid ${t.border}`, boxShadow: t.shadow,
+          marginBottom: 14, animation: 'fade-in 0.2s ease',
+        }}>
+          <div style={{ fontSize: 12, color: t.textSub, marginBottom: 10 }}>
+            Send this code to friends so they can add you to their leaderboard.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{
+              flex: 1, background: t.inputBg, border: `1px solid ${t.border}`,
+              borderRadius: 9, padding: '9px 12px', fontSize: 11,
+              color: t.textMuted, fontFamily: 'monospace',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{myStats.shareCode}</div>
+            <button onClick={copyCode} style={{
+              background: copied ? '#10b981' : '#6366f1', color: '#fff',
+              border: 'none', borderRadius: 9, padding: '9px 16px',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: font,
+              flexShrink: 0, transition: 'background 0.2s',
+            }}>{copied ? '✓ Copied!' : 'Copy'}</button>
+          </div>
         </div>
-        {error && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>{error}</div>}
-      </div>
+      )}
+
+      {/* Add friend panel */}
+      {showAdd && (
+        <div style={{
+          background: t.surface, borderRadius: 12, padding: '14px 16px',
+          border: `1px solid ${t.border}`, boxShadow: t.shadow,
+          marginBottom: 14, animation: 'fade-in 0.2s ease',
+        }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              autoFocus value={code}
+              onChange={e => { setCode(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              placeholder="Paste friend's share code..."
+              style={{
+                flex: 1, background: t.inputBg,
+                border: `1px solid ${error ? '#ef4444' : t.border}`,
+                borderRadius: 9, padding: '9px 12px', fontSize: 13,
+                color: t.text, fontFamily: font, outline: 'none',
+              }}
+            />
+            <button onClick={handleAdd} disabled={!code.trim()} style={{
+              background: code.trim() ? '#6366f1' : t.pill,
+              color: code.trim() ? '#fff' : t.textMuted,
+              border: 'none', borderRadius: 9, padding: '9px 16px',
+              fontSize: 13, fontWeight: 600,
+              cursor: code.trim() ? 'pointer' : 'default',
+              fontFamily: font, flexShrink: 0, transition: 'all 0.2s',
+            }}>Add</button>
+          </div>
+          {error && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>{error}</div>}
+        </div>
+      )}
 
       {/* Leaderboard */}
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 10 }}>
