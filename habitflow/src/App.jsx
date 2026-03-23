@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from './supabase';
 
 // ── Keyframe CSS ──────────────────────────────────────────────────────────────
 const KEYFRAMES = `
@@ -642,8 +643,8 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [habits,      setHabits]      = useStorage('ht_h4', []);
-  const [logs,        setLogs]        = useStorage('ht_l4', {});
+  const [habits,      setHabits]      = useState([]);
+  const [logs,        setLogs]        = useState({});
   const [tutorialDone,setTutorialDone]= useStorage('ht_t4', false);
   const [dark,        setDark]        = useStorage('ht_d4', true);
 
@@ -657,6 +658,20 @@ export default function App() {
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [userName,    setUserName]    = useStorage('ht_name4', '');
   const [friends,     setFriends]     = useStorage('ht_friends4', []);
+
+  // ── Load from Supabase on mount ───────────────────────────────────────────
+  useEffect(() => {
+    supabase.from('habits').select('*').then(({ data }) => {
+      if (data) setHabits(data);
+    });
+    supabase.from('logs').select('*').then(({ data }) => {
+      if (data) {
+        const obj = {};
+        data.forEach(r => { obj[`${r.habit_id}_${r.date}`] = true; });
+        setLogs(obj);
+      }
+    });
+  }, []);
 
   const t            = T(dark);
   const todayStr     = today();
@@ -728,6 +743,11 @@ export default function App() {
       if (wasDone) delete next[key]; else next[key] = true;
       return next;
     });
+    if (wasDone) {
+      supabase.from('logs').delete().eq('habit_id', hid).eq('date', todayStr);
+    } else {
+      supabase.from('logs').insert({ habit_id: hid, date: todayStr });
+    }
   };
 
   const openAdd = () => {
@@ -746,10 +766,16 @@ export default function App() {
 
   const saveHabit = () => {
     if (!newHabit.name.trim()) return;
+    const name = newHabit.name.trim();
     if (editId) {
-      setHabits(prev => prev.map(h => h.id === editId ? { ...h, ...newHabit, name: newHabit.name.trim() } : h));
+      const updates = { name, freq: newHabit.freq, color: newHabit.color, category: newHabit.category };
+      setHabits(prev => prev.map(h => h.id === editId ? { ...h, ...updates } : h));
+      supabase.from('habits').update(updates).eq('id', editId);
     } else {
-      setHabits(prev => [...prev, { ...newHabit, id: uid(), created: todayStr, name: newHabit.name.trim() }]);
+      const id = uid();
+      const habit = { ...newHabit, id, name, created_at: new Date().toISOString() };
+      setHabits(prev => [...prev, habit]);
+      supabase.from('habits').insert(habit);
     }
     closeModal();
   };
@@ -761,15 +787,20 @@ export default function App() {
       Object.keys(next).filter(k => k.startsWith(hid + '_')).forEach(k => delete next[k]);
       return next;
     });
+    supabase.from('habits').delete().eq('id', hid);
   };
 
   const addSuggested = (s) => {
     if (habits.some(h => h.name === s.name)) return;
-    setHabits(prev => [...prev, { ...s, id: uid(), created: todayStr }]);
+    const id = uid();
+    const habit = { ...s, id, created_at: new Date().toISOString() };
+    setHabits(prev => [...prev, habit]);
+    supabase.from('habits').insert(habit);
   };
 
   const resetAll = () => {
-    ['ht_h4','ht_l4','ht_t4','ht_d4','ht_name4','ht_friends4'].forEach(k => localStorage.removeItem(k));
+    ['ht_t4','ht_d4','ht_name4','ht_friends4'].forEach(k => localStorage.removeItem(k));
+    supabase.from('habits').delete().neq('id', '');
     setHabits([]); setLogs({}); setTutorialDone(false); setDark(false); setUserName(''); setFriends([]); setShowDevMenu(false);
   };
 
