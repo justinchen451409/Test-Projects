@@ -641,8 +641,101 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
   );
 }
 
+// ── Auth Screen ───────────────────────────────────────────────────────────────
+function AuthScreen() {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    const fn = isSignUp
+      ? supabase.auth.signUp({ email, password })
+      : supabase.auth.signInWithPassword({ email, password });
+    const { error: err } = await fn;
+    setLoading(false);
+    if (err) setError(err.message);
+  };
+
+  const font = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
+
+  return (
+    <div style={{
+      minHeight: '100vh', background: '#0f1117', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', fontFamily: font,
+    }}>
+      <div style={{
+        background: '#1a1d27', borderRadius: 16, padding: '40px 36px',
+        width: '100%', maxWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        border: '1px solid #2a2d3e',
+      }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+          <div style={{
+            width: 32, height: 32, background: '#6366f1', borderRadius: 9,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 17, fontWeight: 700,
+          }}>✦</div>
+          <span style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>HabitFlow</span>
+        </div>
+
+        <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>
+          {isSignUp ? 'Create account' : 'Welcome back'}
+        </h2>
+        <p style={{ margin: '0 0 24px', fontSize: 14, color: '#64748b' }}>
+          {isSignUp ? 'Start tracking your habits today.' : 'Sign in to your account.'}
+        </p>
+
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+            required
+            style={{
+              background: '#13161f', border: '1px solid #2a2d3e', borderRadius: 9,
+              padding: '11px 14px', fontSize: 14, color: '#e2e8f0', fontFamily: font,
+              outline: 'none',
+            }}
+          />
+          <input
+            type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
+            required
+            style={{
+              background: '#13161f', border: '1px solid #2a2d3e', borderRadius: 9,
+              padding: '11px 14px', fontSize: 14, color: '#e2e8f0', fontFamily: font,
+              outline: 'none',
+            }}
+          />
+          {error && <p style={{ margin: 0, fontSize: 13, color: '#f43f5e' }}>{error}</p>}
+          <button type="submit" disabled={loading} style={{
+            background: '#6366f1', border: 'none', borderRadius: 9,
+            padding: '11px 14px', fontSize: 14, fontWeight: 600, color: '#fff',
+            cursor: loading ? 'not-allowed' : 'pointer', fontFamily: font,
+            opacity: loading ? 0.7 : 1, marginTop: 4,
+          }}>
+            {loading ? '...' : isSignUp ? 'Create account' : 'Sign in'}
+          </button>
+        </form>
+
+        <p style={{ marginTop: 20, fontSize: 13, color: '#64748b', textAlign: 'center' }}>
+          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button onClick={() => { setIsSignUp(s => !s); setError(''); }} style={{
+            background: 'none', border: 'none', color: '#6366f1',
+            cursor: 'pointer', fontFamily: font, fontSize: 13, fontWeight: 600, padding: 0,
+          }}>
+            {isSignUp ? 'Sign in' : 'Sign up'}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  const [session, setSession] = useState(undefined); // undefined = loading, null = logged out
   const [habits,      setHabits]      = useState([]);
   const [logs,        setLogs]        = useState({});
   const [tutorialDone,setTutorialDone]= useStorage('ht_t4', false);
@@ -659,8 +752,16 @@ export default function App() {
   const [userName,    setUserName]    = useStorage('ht_name4', '');
   const [friends,     setFriends]     = useStorage('ht_friends4', []);
 
-  // ── Load from Supabase on mount ───────────────────────────────────────────
+  // ── Auth session ─────────────────────────────────────────────────────────
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ?? null));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Load from Supabase when session is ready ──────────────────────────────
+  useEffect(() => {
+    if (!session) return;
     supabase.from('habits').select('*').then(({ data }) => {
       if (data) setHabits(data);
     });
@@ -671,7 +772,7 @@ export default function App() {
         setLogs(obj);
       }
     });
-  }, []);
+  }, [session]);
 
   const t            = T(dark);
   const todayStr     = today();
@@ -773,7 +874,7 @@ export default function App() {
       supabase.from('habits').update(updates).eq('id', editId);
     } else {
       const id = uid();
-      const habit = { ...newHabit, id, name, created_at: new Date().toISOString() };
+      const habit = { ...newHabit, id, name, created_at: new Date().toISOString(), user_id: session.user.id };
       setHabits(prev => [...prev, habit]);
       supabase.from('habits').insert(habit);
     }
@@ -793,7 +894,7 @@ export default function App() {
   const addSuggested = (s) => {
     if (habits.some(h => h.name === s.name)) return;
     const id = uid();
-    const habit = { ...s, id, created_at: new Date().toISOString() };
+    const habit = { ...s, id, created_at: new Date().toISOString(), user_id: session.user.id };
     setHabits(prev => [...prev, habit]);
     supabase.from('habits').insert(habit);
   };
@@ -805,6 +906,9 @@ export default function App() {
   };
 
   const font = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
+
+  if (session === undefined) return null; // still loading
+  if (!session) return <AuthScreen />;
 
   return (
     <div style={{ minHeight: '100vh', background: t.bg, fontFamily: font, color: t.text, transition: 'background 0.2s' }}>
@@ -864,6 +968,14 @@ export default function App() {
           >
             {dark ? '☀️ Light' : '🌙 Dark'}
           </button>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{
+              background: 'none', border: `1px solid ${t.border}`, borderRadius: 99,
+              padding: '5px 12px', fontSize: 12, fontWeight: 600, color: t.textSub,
+              cursor: 'pointer', fontFamily: font,
+            }}
+          >Sign out</button>
         </div>
       </div>
 
