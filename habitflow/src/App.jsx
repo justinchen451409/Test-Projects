@@ -428,6 +428,7 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
     setEditName(false);
   };
 
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
   const MEDAL = ['🥇', '🥈', '🥉'];
 
   return (
@@ -557,9 +558,40 @@ function FriendsView({ myStats, userName, setUserName, friends, onAddFriend, onR
         </div>
       )}
 
-      {/* Leaderboard */}
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted, marginBottom: 10 }}>
-        LEADERBOARD · {allEntries.length} {allEntries.length === 1 ? 'PERSON' : 'PEOPLE'}
+      {/* Leaderboard header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, position: 'relative' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: t.textMuted }}>
+          LEADERBOARD · {allEntries.length} {allEntries.length === 1 ? 'PERSON' : 'PEOPLE'}
+        </div>
+        <button
+          onClick={() => setShowScoreInfo(s => !s)}
+          title="How is score calculated?"
+          style={{
+            width: 18, height: 18, borderRadius: '50%',
+            border: `1px solid ${t.borderStrong}`, background: 'none',
+            color: t.textMuted, fontSize: 11, fontWeight: 700,
+            cursor: 'pointer', fontFamily: font, lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >?</button>
+        {showScoreInfo && (
+          <div style={{
+            position: 'absolute', top: 24, left: 0, zIndex: 50,
+            background: t.surface, border: `1px solid ${t.border}`,
+            borderRadius: 10, padding: '10px 14px', boxShadow: t.shadowMd,
+            width: 240, animation: 'fade-in 0.15s ease',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.text, marginBottom: 6 }}>How score is calculated</div>
+            <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.6 }}>
+              <span style={{ fontFamily: 'monospace', background: t.inputBg, padding: '1px 5px', borderRadius: 4, color: t.text }}>
+                weekly avg + (best streak × 2)
+              </span>
+              <br /><br />
+              Streaks are worth double to reward long-term consistency.
+            </div>
+          </div>
+        )}
       </div>
 
       {allEntries.map((entry, i) => (
